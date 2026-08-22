@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+ledger.sqlite
+receipts/*.json
+undo_log.jsonl
+output/*
+archive/*
+input/*
+!input/.gitkeep
+!output/.gitkeep
+!receipts/.gitkeep
