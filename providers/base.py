@@ -20,3 +20,7 @@ class Provider(ABC):
 
     @abstractmethod
     def estimate_cost(self, input_tokens: int, output_tokens: int) -> dict: ...
+
+    def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        """Return embeddings, when supported by the provider."""
+        raise NotImplementedError(f"{type(self).__name__} does not support embeddings")

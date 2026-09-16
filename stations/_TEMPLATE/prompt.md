@@ -1,0 +1,1 @@
+Review the anomaly and decide which live copy is canonical. Begin with one short JSON object on a single line containing `"verdict"` and a one-line `"reason"`. Follow it with concise prose explaining the evidence and a safe archival recommendation. Never recommend deleting a file.
