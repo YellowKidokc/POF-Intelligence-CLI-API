@@ -15,4 +15,7 @@ def create_provider(name, api_key="", base_url=None):
     if name == "ollama":
         from .ollama_provider import OllamaProvider
         return OllamaProvider(base_url or "http://localhost:11434", api_key)
+    if name == "openrouter":
+        from .openrouter_provider import OpenRouterProvider
+        return OpenRouterProvider(api_key, base_url or "https://openrouter.ai/api/v1")
     raise ValueError(f"Unknown provider: {name}")

@@ -28,3 +28,20 @@ python cli.py --health
 ```
 
 The provider SDKs are imported only when selected. OpenAI, DeepSeek, Claude, Gemini, and Ollama profiles share the same CLI surface. Watch registries live under `registries/`; conversion only dispatches files to the existing NAS station and does not implement converters or Playwright workers.
+
+## Stations
+
+A station is a duplicatable folder containing one job definition (`station.json`), its prompt, and an auditable lifecycle: `inbox/` → `waiting/` → `outbox/` (or `failed/`), with one JSON receipt per processed item. Moving into `waiting/` is the claim lock; abandoned claims are recovered after 15 minutes. Runs preview by default and only mutate files with `--execute`.
+
+```bash
+python cli.py --station stations/01_duplicate_live_copies
+python cli.py --station stations/01_duplicate_live_copies --execute
+python cli.py --station-new 02_orphan_good_page --from stations/_TEMPLATE
+python cli.py --station-status
+python cli.py --chain stations/chain.json --execute
+python cli.py --vectorize stations/01_duplicate_live_copies/outbox --station stations/01_duplicate_live_copies --execute
+python cli.py --vector-search "canonical duplicate" --station stations/01_duplicate_live_copies
+python cli.py --openrouter-watch --once
+```
+
+To build a chain, set station N's `on_success` to `../02_next_station/inbox`, list both folders in a root-level chain file such as `{"name":"review","stations":["01_duplicate_live_copies","02_next_station"]}`, and run it with `--chain`. The first station retains its result and sends an audited copy to the next inbox. Aggregate stations use `sources` (files, folders, or globs, including read-only shares) and emit one report without modifying their sources. See `stations/INPUT_FORMAT.md` for anomaly inputs and `stations/PLANNED.md` for jobs ready to duplicate.

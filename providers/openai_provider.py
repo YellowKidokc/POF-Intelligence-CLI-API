@@ -4,6 +4,7 @@ from .base import Provider, ProviderResponse
 PRICING = {
     "gpt-4o": (2.50, 10.00),
     "deepseek-chat": (0.27, 1.10),
+    "text-embedding-3-small": (0.02, 0.0),
 }
 
 
@@ -27,3 +28,7 @@ class OpenAIProvider(Provider):
         rates = PRICING.get(getattr(self, "model", ""), (0.0, 0.0))
         cost = (input_tokens * rates[0] + output_tokens * rates[1]) / 1_000_000
         return {"input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": cost}
+
+    def embed(self, texts, model="text-embedding-3-small"):
+        result = self.client.embeddings.create(input=texts, model=model)
+        return [row.embedding for row in result.data]

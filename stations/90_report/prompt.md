@@ -1,0 +1,1 @@
+Synthesize the supplied sources into one concise audit report. Begin with a short JSON header containing `"report_status"` and a one-line `"reason"`, then use Markdown headings, findings, evidence paths, and reversible next actions.

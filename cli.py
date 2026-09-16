@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """POF Intelligence CLI: providers, audited file routing, scans, and dispatch."""
-import argparse, configparser, hashlib, json, sys, time
+import argparse, configparser, hashlib, json, os, sys, time
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -20,6 +20,11 @@ def parser():
     p.add_argument("--rename", nargs=2, metavar=("PATH", "NEW_NAME")); p.add_argument("--archive"); p.add_argument("--undo", nargs="?", const=1, type=int)
     p.add_argument("--scan"); p.add_argument("--fis-actions"); p.add_argument("--convert"); p.add_argument("--nlp", nargs="+", metavar="ARG")
     p.add_argument("--route"); p.add_argument("--stats", action="store_true"); p.add_argument("--health", action="store_true")
+    p.add_argument("--station"); p.add_argument("--chain"); p.add_argument("--station-new")
+    p.add_argument("--from", dest="station_from"); p.add_argument("--description", default="")
+    p.add_argument("--station-status", action="store_true"); p.add_argument("--vectorize")
+    p.add_argument("--vector-search"); p.add_argument("--top-k", type=int, default=10)
+    p.add_argument("--openrouter-watch", action="store_true"); p.add_argument("--once", action="store_true")
     return p
 
 
@@ -47,13 +52,15 @@ def prompt_text(args):
     return "\n".join(parts).strip()
 
 
-def api_call(args, text, ledger):
-    settings = profile(args.config, args.profile); system = Path(args.system).read_text(encoding="utf-8") if args.system else ""
+def api_call(args, text, ledger, *, output_path=None, ledger_extra=None, provider_instance=None):
+    settings = profile(args.config, args.profile); settings.update(getattr(args, "settings_override", {}) or {})
+    system = Path(args.system).read_text(encoding="utf-8") if args.system and Path(args.system).exists() else ""
     messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": text}]
     if args.dry_run:
-        print(json.dumps({"profile": args.profile, "provider": settings["provider"], "model": settings["model"], "messages": messages}, indent=2)); return
+        estimate = {"input_tokens": max(1, len(text) // 4), "output_tokens": int(settings["max_tokens"]), "cost_usd": 0.0}
+        print(json.dumps({"profile": args.profile, "provider": settings["provider"], "model": settings["model"], "messages": messages, "estimate": estimate}, indent=2)); return {"text": "", **estimate, "model": settings["model"]}
     from providers import create_provider
-    provider = create_provider(settings["provider"], settings["api_key"], settings["base_url"] or None); provider.model = settings["model"]
+    provider = provider_instance or create_provider(settings["provider"], settings["api_key"], settings["base_url"] or None); provider.model = settings["model"]
     started = time.monotonic()
     if args.stream:
         chunks = []
@@ -62,10 +69,12 @@ def api_call(args, text, ledger):
         print(); output = "".join(chunks); inputs = outputs = 0
     else:
         response = provider.call(messages, settings["model"], float(settings["temperature"]), int(settings["max_tokens"])); output, inputs, outputs = response.text, response.input_tokens, response.output_tokens; print(output)
-    estimate = provider.estimate_cost(inputs, outputs); out_dir = ROOT / "output"; out_dir.mkdir(exist_ok=True)
-    output_path = out_dir / time.strftime("response_%Y%m%d_%H%M%S.md"); output_path.write_text(output, encoding="utf-8")
-    ledger.record("api_call", provider=settings["provider"], model=settings["model"], profile=args.profile, input_hash=hashlib.sha256(text.encode()).hexdigest(), output_hash=hashlib.sha256(output.encode()).hexdigest(), input_tokens=inputs, output_tokens=outputs, cost_usd=estimate["cost_usd"], dest_path=str(output_path), status="success", duration_seconds=time.monotonic() - started)
+    estimate = provider.estimate_cost(inputs, outputs); output_path = Path(output_path) if output_path else ROOT / "output" / time.strftime("response_%Y%m%d_%H%M%S.md")
+    output_path.parent.mkdir(parents=True, exist_ok=True); output_path.write_text(output, encoding="utf-8")
+    values = dict(provider=settings["provider"], model=settings["model"], profile=args.profile, input_hash=hashlib.sha256(text.encode()).hexdigest(), output_hash=hashlib.sha256(output.encode()).hexdigest(), input_tokens=inputs, output_tokens=outputs, cost_usd=estimate["cost_usd"], dest_path=str(output_path), status="success", duration_seconds=time.monotonic() - started)
+    values.update(ledger_extra or {}); ledger.record("api_call", **values)
     print(f'\nSaved: {output_path} | Estimated cost: ${estimate["cost_usd"]:.6f}', file=sys.stderr)
+    return {"text": output, **estimate, "model": settings["model"], "output_path": str(output_path)}
 
 
 def health(args):
@@ -74,8 +83,50 @@ def health(args):
     return {"python": sys.version.split()[0], "profile": args.profile, "provider": settings["provider"], "api_key_configured": bool(settings["api_key"]), "watched_folders": folders}
 
 
+def station_status(root=ROOT / "stations"):
+    from stations.model_router import remaining_allowance
+    results = []
+    for config_path in sorted(Path(root).glob("*/station.json")):
+        station = config_path.parent; config = json.loads(config_path.read_text(encoding="utf-8"))
+        row = {"station": config.get("name", station.name)}
+        for name in ("inbox", "waiting", "outbox", "failed"):
+            row[name] = sum(1 for path in (station / name).rglob("*") if path.is_file())
+        try:
+            settings = profile(ROOT / "config.ini", config.get("provider_profile", "default"))
+            row.update(provider=settings["provider"], model=config.get("model") or settings["model"], api_key_configured=bool(settings["api_key"]), cost_ceiling_usd=config.get("cost_ceiling_usd"))
+        except ValueError as error: row["configuration_error"] = str(error)
+        if config.get("provider_profile") == "openrouter": row["free_requests_remaining"] = remaining_allowance()
+        results.append(row)
+    return results
+
+
 def main(argv=None):
     args = parser().parse_args(argv); ledger = Ledger(ROOT / "ledger.sqlite"); router = FileRouter(ROOT, ledger)
+    if args.station_new:
+        from stations.duplicate import duplicate_station
+        if not args.station_from: raise ValueError("--station-new requires --from")
+        print(duplicate_station(args.station_from, args.station_new, description=args.description)); return 0
+    if args.station_status: print(json.dumps(station_status(), indent=2)); return 0
+    if args.chain:
+        from stations.chain import run_chain
+        print(json.dumps(run_chain(args.chain, execute=args.execute), indent=2)); return 0
+    if args.vectorize:
+        from stations.vectorize import vectorize_folder
+        station = Path(args.station).resolve() if args.station else Path(args.vectorize).resolve().parent
+        config = json.loads((station / "station.json").read_text())
+        print(json.dumps(vectorize_folder(args.vectorize, station, execute=args.execute, profile_name=config["provider_profile"], model=config.get("embedding_model", "text-embedding-3-small")), indent=2)); return 0
+    if args.vector_search:
+        from stations.vectorize import VectorStore
+        if not args.station: raise ValueError("--vector-search requires --station")
+        config = json.loads((Path(args.station) / "station.json").read_text())
+        store = VectorStore(args.station, profile_name=config["provider_profile"], model=config.get("embedding_model", "text-embedding-3-small"))
+        print(json.dumps(store.search(args.vector_search, args.top_k), indent=2)); return 0
+    if args.openrouter_watch:
+        from stations.model_router import watch
+        watch(once=args.once); return 0
+    if args.station:
+        from stations.runner import run_station
+        print(json.dumps(run_station(args.station, execute=args.execute, profile_override=None if args.profile == "default" else args.profile), indent=2)); return 0
     if args.stats: print(json.dumps(ledger.stats(), indent=2)); return 0
     if args.health: print(json.dumps(health(args), indent=2)); return 0
     if args.scan:

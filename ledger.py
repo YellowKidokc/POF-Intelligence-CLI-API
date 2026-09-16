@@ -2,14 +2,18 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA = """CREATE TABLE IF NOT EXISTS operations (id INTEGER PRIMARY KEY,timestamp TEXT NOT NULL,operation TEXT NOT NULL,provider TEXT,model TEXT,profile TEXT,input_hash TEXT,output_hash TEXT,input_tokens INTEGER,output_tokens INTEGER,cost_usd REAL,source_path TEXT,dest_path TEXT,status TEXT,error_message TEXT,receipt_path TEXT,duration_seconds REAL);
+SCHEMA = """CREATE TABLE IF NOT EXISTS operations (id INTEGER PRIMARY KEY,timestamp TEXT NOT NULL,operation TEXT NOT NULL,provider TEXT,model TEXT,profile TEXT,input_hash TEXT,output_hash TEXT,input_tokens INTEGER,output_tokens INTEGER,cost_usd REAL,source_path TEXT,dest_path TEXT,status TEXT,error_message TEXT,receipt_path TEXT,duration_seconds REAL,station TEXT,item TEXT);
 CREATE TABLE IF NOT EXISTS cumulative_costs (provider TEXT PRIMARY KEY,total_calls INTEGER DEFAULT 0,total_input_tokens INTEGER DEFAULT 0,total_output_tokens INTEGER DEFAULT 0,total_cost_usd REAL DEFAULT 0.0,last_call TEXT);"""
 
 
 class Ledger:
     def __init__(self, path="ledger.sqlite"):
         self.path = Path(path); self.connection = sqlite3.connect(self.path)
-        self.connection.executescript(SCHEMA); self.connection.commit()
+        self.connection.executescript(SCHEMA)
+        columns = {row[1] for row in self.connection.execute("PRAGMA table_info(operations)")}
+        for name in ("station", "item"):
+            if name not in columns: self.connection.execute(f"ALTER TABLE operations ADD COLUMN {name} TEXT")
+        self.connection.commit()
 
     def record(self, operation, **values):
         now = datetime.now(timezone.utc).isoformat()

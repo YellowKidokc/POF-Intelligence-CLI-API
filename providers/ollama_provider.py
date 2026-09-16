@@ -20,3 +20,10 @@ class OllamaProvider(Provider):
 
     def estimate_cost(self, input_tokens, output_tokens):
         return {"input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": 0.0}
+
+    def embed(self, texts, model):
+        vectors = []
+        for text in texts:
+            response = requests.post(f"{self.base_url}/api/embeddings", json={"model": model, "prompt": text}, timeout=300)
+            response.raise_for_status(); vectors.append(response.json()["embedding"])
+        return vectors

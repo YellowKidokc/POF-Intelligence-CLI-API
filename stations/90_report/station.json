@@ -1,0 +1,31 @@
+{
+  "provider_profile": "deepseek",
+  "model": "",
+  "max_tokens": 4096,
+  "temperature": 0.2,
+  "max_input_chars": 120000,
+  "batch_size": 1,
+  "concurrency": 1,
+  "input_globs": [
+    "*.md",
+    "*.json"
+  ],
+  "attachments": [],
+  "output_name": "report_{date}.{ext}",
+  "categorize_by": "",
+  "on_success": "outbox",
+  "on_failure": "failed",
+  "move_input_to": "outbox/_consumed",
+  "require_execute": true,
+  "cost_ceiling_usd": 1.0,
+  "mode": "aggregate",
+  "sources": [],
+  "vectorize": false,
+  "max_probe_seconds": 45,
+  "max_latency_seconds": 120,
+  "min_context_tokens": 0,
+  "demote_minutes": 120,
+  "name": "90_report",
+  "description": "Combine many report sources into one evidence-based Markdown report.",
+  "output_format": "md"
+}

@@ -1,0 +1,1 @@
+Create a complete standalone offline HTML report. Start exactly with `<!doctype html>`. Include all CSS inline and no external URLs. Begin the body with a compact JSON header in a `<script type="application/json">` containing `"report_status"` and a one-line `"reason"`, followed by an executive summary, findings, paths, severity badges, and reversible actions.
