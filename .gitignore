@@ -10,3 +10,6 @@ input/*
 !input/.gitkeep
 !output/.gitkeep
 !receipts/.gitkeep
+
+config.local.ini
+_watch_state/

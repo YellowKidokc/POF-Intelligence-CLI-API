@@ -7,8 +7,10 @@ class OllamaProvider(Provider):
         self.base_url = base_url.rstrip("/")
 
     def call(self, messages, model, temperature, max_tokens):
-        response = requests.post(f"{self.base_url}/api/chat", json={"model": model, "messages": messages, "stream": False, "options": {"temperature": temperature, "num_predict": max_tokens}}, timeout=300)
+        response = requests.post(f"{self.base_url}/api/chat", json={"model": model, "messages": messages, "stream": False, "options": {"temperature": temperature, "num_predict": max_tokens, "num_ctx": sum(len(m["content"].encode("utf-8")) for m in messages) + max_tokens + 256}}, timeout=300)
         response.raise_for_status(); data = response.json()
+        if data.get("done_reason") == "length":
+            raise RuntimeError("Incomplete model output: output/context limit reached")
         return ProviderResponse(data["message"]["content"], data.get("prompt_eval_count", 0), data.get("eval_count", 0))
 
     def stream(self, messages, model, temperature, max_tokens):

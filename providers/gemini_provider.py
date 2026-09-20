@@ -10,6 +10,8 @@ class GeminiProvider(Provider):
     def call(self, messages, model, temperature, max_tokens):
         from google.genai import types
         r = self.client.models.generate_content(model=model, contents=self._prompt(messages), config=types.GenerateContentConfig(temperature=temperature, max_output_tokens=max_tokens))
+        if any('MAX_TOKENS' in str(getattr(candidate, 'finish_reason', '')) for candidate in (r.candidates or [])):
+            raise RuntimeError('Incomplete model output: output/context limit reached')
         usage = r.usage_metadata
         return ProviderResponse(r.text or "", usage.prompt_token_count or 0, usage.candidates_token_count or 0)
     def stream(self, messages, model, temperature, max_tokens):

@@ -87,14 +87,7 @@ def _sources(station, entries):
 
 
 def _source_text(path):
-    text = _read(path)
-    if path.name == "bundle.json":
-        try:
-            data = json.loads(text)
-            if data.get("schema") == "david-os/aggregate-report/1":
-                text = json.dumps({key: data.get(key) for key in ("totals", "anomalies", "quality")}, indent=2)
-        except json.JSONDecodeError: pass
-    return text
+    return _read(path)  # Aggregate sources stay complete, including bundle metadata.
 
 
 def _call(station, config, text, output_path, ledger, item, profile_override, execute):
@@ -166,7 +159,7 @@ def run_station(station_dir, *, execute=False, limit=None, profile_override=None
     summary["planned"] = len(items)
     if not execute:
         max_chars = int(config["max_input_chars"])
-        summary["estimated_input_tokens"] = sum(min(len(_read(p)), max_chars) // 4 for p in items)
+        summary["estimated_input_tokens"] = sum(len(_read(p)) // 4 for p in items)
         try:
             from providers.openai_provider import PRICING
             rates = PRICING.get(model, (0.0, 0.0))
@@ -186,7 +179,7 @@ def run_station(station_dir, *, execute=False, limit=None, profile_override=None
         produced_output = None
         try:
             router.move(source, waiting, dry_run=False); summary["claimed"] += 1
-            raw = _read(waiting); truncated = len(raw) > max_chars; body = raw[:max_chars]
+            raw = _read(waiting); truncated = False; body = raw
             text = f"{prompt}\n\n--- item: {source.name} ---\n{body}{attachment_text}"
             ext = config["output_format"]; provisional = station / "outbox" / config["output_name"].format(stem=source.stem, ext=ext, date=time.strftime("%Y-%m-%d"))
             result = _call(station, config, text, provisional, ledger, source.name, profile_override, True)
@@ -231,10 +224,7 @@ def _run_aggregate(station, config, summary, execute, profile_override):
             handoff = source.parent / "HANDOFF_PROMPT.md"
             if handoff.exists(): prompt = _read(handoff); break
     chunks = [f"--- {p.name} ---\n{_source_text(p)}" for p in sources]
-    combined = "\n\n".join(chunks); maximum = int(config["max_input_chars"]); two_pass = len(combined) > maximum
-    if two_pass:
-        allowance = max(200, maximum // max(1, len(chunks)))
-        combined = "\n\n".join(chunk[:allowance] + ("\n[per-source summary truncated]" if len(chunk) > allowance else "") for chunk in chunks)[:maximum]
+    combined = "\n\n".join(chunks); two_pass = False  # Complete sources; no excerpt masquerading as a second pass.
     text = f"{prompt}\n\n{combined}"
     name = config["output_name"].format(stem=config["name"], ext=config["output_format"], date=time.strftime("%Y-%m-%d"))
     output = station / "outbox" / name

@@ -1,0 +1,21 @@
+{
+  "baselines": {
+    "pof": "433488d19ed557a09ef0fd962187c14cf7651f13",
+    "workflows": "7b6f6a406a52f2d77d8e144bbc90ca1511ae2b31"
+  },
+  "comparison": "tracked relative paths; conceptual overlap documented separately",
+  "same_path": [
+    {
+      "path": ".gitignore",
+      "identical": false,
+      "pof_sha256": "26fd49df349d295f80a8dd9ae27b99f461cd6970fef51bb4f71f47a09994bf1b",
+      "workflows_sha256": "c164d520971c9acf1194db1553a99c139f138065c9c15f12f5ed890a7f34f5f2"
+    },
+    {
+      "path": "README.md",
+      "identical": false,
+      "pof_sha256": "a7c47a048669024f6b09db45c2305ac5581e36811d9d02db8ce86e7053f682bd",
+      "workflows_sha256": "554ba5da8a0ee7f2b37191c79133098f9fd6b4ceb3a6b306f563ab95381d6496"
+    }
+  ]
+}

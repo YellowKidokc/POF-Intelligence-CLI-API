@@ -40,7 +40,7 @@ def station(root, name, *, handoff="outbox", ceiling=10):
     return path
 
 
-def test_claim_lock_and_truncation_receipt(tmp_path, monkeypatch):
+def test_claim_lock_preserves_complete_source(tmp_path, monkeypatch):
     root = make_root(tmp_path, monkeypatch); work = station(root, "one")
     (work / "inbox" / "a.md").write_text("0123456789EXTRA")
     from stations.runner import run_station
@@ -48,7 +48,7 @@ def test_claim_lock_and_truncation_receipt(tmp_path, monkeypatch):
     assert result["claimed"] == result["successes"] == 1
     assert not list((work / "waiting").iterdir())
     receipt = json.loads(next((work / "receipts").glob("*.json")).read_text())
-    assert receipt["truncated"] is True and receipt["original_chars"] == 15 and receipt["used_chars"] == 10
+    assert receipt["truncated"] is False and receipt["original_chars"] == 15 and receipt["used_chars"] == 15
 
 
 def test_dry_run_touches_nothing(tmp_path, monkeypatch):

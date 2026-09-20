@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 
 def parser():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--profile", default="default"); p.add_argument("--config", default=str(ROOT / "config.ini"))
+    p.add_argument("--profile", default="default"); p.add_argument("--config", default=os.environ.get('POF_CONFIG', str(ROOT / "config.ini")))
     p.add_argument("--dry-run", action="store_true"); p.add_argument("--execute", action="store_true", help="confirm filesystem mutations")
     p.add_argument("--clipboard", action="store_true"); p.add_argument("--url"); p.add_argument("--batch")
     p.add_argument("--stream", action="store_true"); p.add_argument("--conversation", action="store_true"); p.add_argument("--system", default=str(ROOT / "system.txt"))
@@ -32,7 +32,10 @@ def profile(path, name):
     config = configparser.ConfigParser(); config.read(path)
     if name not in config: raise ValueError(f"Profile [{name}] not found in {path}")
     defaults = config["default"] if "default" in config else {}
-    return {key.lower(): config[name].get(key, defaults.get(key, fallback) if hasattr(defaults, "get") else fallback) for key, fallback in {"provider": name, "model": "", "api_key": "", "base_url": "", "max_tokens": "4096", "temperature": "0.7"}.items()}
+    settings = {key.lower(): config[name].get(key, defaults.get(key, fallback) if hasattr(defaults, "get") else fallback) for key, fallback in {"provider": name, "model": "", "api_key": "", "base_url": "", "max_tokens": "4096", "temperature": "0.7"}.items()}
+    env_key = {"openai": "OPENAI_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "claude": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY", "openrouter": "OPENROUTER_API_KEY"}.get(settings["provider"], "")
+    settings["api_key"] = os.environ.get(env_key, "") or settings["api_key"]
+    return settings
 
 
 def prompt_text(args):

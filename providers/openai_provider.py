@@ -15,6 +15,8 @@ class OpenAIProvider(Provider):
 
     def call(self, messages, model, temperature, max_tokens):
         result = self.client.chat.completions.create(messages=messages, model=model, temperature=temperature, max_tokens=max_tokens)
+        if result.choices[0].finish_reason == "length":
+            raise RuntimeError("Incomplete model output: output/context limit reached")
         usage = result.usage
         return ProviderResponse(result.choices[0].message.content or "", usage.prompt_tokens, usage.completion_tokens)
 

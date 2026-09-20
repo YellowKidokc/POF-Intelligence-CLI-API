@@ -45,3 +45,7 @@ python cli.py --openrouter-watch --once
 ```
 
 To build a chain, set station N's `on_success` to `../02_next_station/inbox`, list both folders in a root-level chain file such as `{"name":"review","stations":["01_duplicate_live_copies","02_next_station"]}`, and run it with `--chain`. The first station retains its result and sends an audited copy to the next inbox. Aggregate stations use `sources` (files, folders, or globs, including read-only shares) and emit one report without modifying their sources. See `stations/INPUT_FORMAT.md` for anomaly inputs and `stations/PLANNED.md` for jobs ready to duplicate.
+
+## Shared system entry point
+
+Run `SYSTEM.bat list` for readable workflow names. Both repositories expose the same front door for workflow runs, folder watching, folder-task assessment, provider profiles, and audited file routing. See [Combined system guide](docs/COMBINED_SYSTEM.md) for ownership, setup, examples, and limits.
